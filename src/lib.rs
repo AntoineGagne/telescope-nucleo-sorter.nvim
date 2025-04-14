@@ -1,5 +1,3 @@
-use std::ops::Deref;
-
 use mimalloc::MiMalloc;
 use mlua::{
     prelude::{Lua, LuaResult, LuaString, LuaTable, LuaUserDataMethods},
