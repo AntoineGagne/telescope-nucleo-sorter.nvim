@@ -1,4 +1,14 @@
-use mlua::prelude::*;
+use std::ops::Deref;
+
+use mimalloc::MiMalloc;
+use mlua::{
+    prelude::{Lua, LuaResult, LuaString, LuaTable, LuaUserDataMethods},
+    FromLua, UserData, Value,
+};
+use nucleo_matcher::pattern::{CaseMatching, Normalization};
+
+#[global_allocator]
+static GLOBAL: MiMalloc = MiMalloc;
 
 struct Matcher {
     matcher: nucleo_matcher::Matcher,
