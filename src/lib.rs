@@ -19,13 +19,21 @@ impl mlua::UserData for Matcher {
     fn add_methods<'lua, M: LuaUserDataMethods<'lua, Self>>(methods: &mut M) {
         methods.add_method_mut(
             "set_pattern",
-            |_, this: &mut Matcher, (patt,): (LuaString,)| {
-                this.pattern = Some(nucleo_matcher::pattern::Pattern::parse(
-                    patt.to_str()?,
-                    nucleo_matcher::pattern::CaseMatching::Ignore,
-                    nucleo_matcher::pattern::Normalization::Smart,
-                ));
-                return Ok(());
+            |_, this: &mut Matcher, pattern: LuaString| {
+                if let Some(old) = this.pattern.as_mut() {
+                    old.reparse(
+                        pattern.to_str()?,
+                        this.options.case_mode,
+                        this.options.normalization,
+                    );
+                } else {
+                    this.pattern = Some(nucleo_matcher::pattern::Pattern::parse(
+                        pattern.to_str()?,
+                        this.options.case_mode,
+                        this.options.normalization,
+                    ));
+                };
+                Ok(())
             },
         );
         methods.add_method_mut("match", |_, this: &mut Matcher, (str,): (LuaString,)| {
