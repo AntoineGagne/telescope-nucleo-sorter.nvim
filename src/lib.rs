@@ -109,7 +109,7 @@ impl FromLua<'_> for MatchOptions {
     }
 }
 
-#[mlua::lua_module]
+#[mlua::lua_module(skip_memory_check)]
 fn nucleo_nvim(lua: &Lua) -> LuaResult<LuaTable> {
     let exports = lua.create_table()?;
     exports.set(
