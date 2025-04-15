@@ -26,44 +26,45 @@ impl Default for Matcher {
 
 impl UserData for Matcher {
     fn add_methods<'lua, M: LuaUserDataMethods<'lua, Self>>(methods: &mut M) {
-        methods.add_method_mut(
-            "set_pattern",
-            |_, this: &mut Matcher, pattern: LuaString| {
-                if let Some(old) = this.pattern.as_mut() {
-                    old.reparse(
-                        pattern.to_str()?,
-                        this.options.case_mode,
-                        this.options.normalization,
-                    );
-                } else {
-                    this.pattern = Some(nucleo_matcher::pattern::Pattern::parse(
-                        pattern.to_str()?,
-                        this.options.case_mode,
-                        this.options.normalization,
-                    ));
-                };
-                Ok(())
-            },
-        );
-        methods.add_method_mut("match", |_, this: &mut Self, (str,): (LuaString,)| {
-            this.pattern
-                .as_ref()
-                .map(|pattern| {
-                    if pattern.atoms.is_empty() {
-                        return (1, vec![]);
-                    }
-
-                    let as_bytes = str.as_bytes();
-                    let ascii_encoded = nucleo_matcher::Utf32Str::Ascii(as_bytes);
-                    let mut results = vec![];
-                    pattern
-                        .indices(ascii_encoded, &mut this.matcher, &mut results)
-                        .map(|score| (score, results.iter().map(|x| x + 1).collect()))
-                        .unwrap_or_else(|| (0, results))
-                })
-                .ok_or_else(|| mlua::Error::runtime("[nucleo_matcher]: Pattern is empty"))
-        });
+        methods.add_method_mut("set_pattern", set_pattern);
+        methods.add_method_mut("match", match_pattern);
     }
+}
+
+fn set_pattern(_: &Lua, this: &mut Matcher, pattern: LuaString) -> LuaResult<()> {
+    if let Some(old) = this.pattern.as_mut() {
+        old.reparse(
+            pattern.to_str()?,
+            this.options.case_mode,
+            this.options.normalization,
+        );
+    } else {
+        this.pattern = Some(nucleo_matcher::pattern::Pattern::parse(
+            pattern.to_str()?,
+            this.options.case_mode,
+            this.options.normalization,
+        ));
+    };
+    Ok(())
+}
+
+fn match_pattern(_: &Lua, this: &mut Matcher, str: LuaString) -> LuaResult<(u32, Vec<u32>)> {
+    this.pattern
+        .as_ref()
+        .map(|pattern| {
+            if pattern.atoms.is_empty() {
+                return (1, vec![]);
+            }
+
+            let as_bytes = str.as_bytes();
+            let ascii_encoded = nucleo_matcher::Utf32Str::Ascii(as_bytes);
+            let mut results = vec![];
+            pattern
+                .indices(ascii_encoded, &mut this.matcher, &mut results)
+                .map(|score| (score, results.iter().map(|x| x + 1).collect()))
+                .unwrap_or_else(|| (0, results))
+        })
+        .ok_or_else(|| mlua::Error::runtime("[nucleo_matcher]: Pattern is empty"))
 }
 
 struct MatchOptions {
@@ -112,15 +113,14 @@ impl FromLua<'_> for MatchOptions {
 #[mlua::lua_module(skip_memory_check)]
 fn nucleo_nvim(lua: &Lua) -> LuaResult<LuaTable> {
     let exports = lua.create_table()?;
-    exports.set(
-        "create_matcher",
-        lua.create_function(|_, options: MatchOptions| {
-            let matcher = Matcher {
-                options,
-                ..Matcher::default()
-            };
-            Ok((matcher,))
-        })?,
-    )?;
+    exports.set("create_matcher", lua.create_function(create_matcher)?)?;
     Ok(exports)
+}
+
+fn create_matcher(_: &Lua, options: MatchOptions) -> LuaResult<Matcher> {
+    let matcher = Matcher {
+        options,
+        ..Matcher::default()
+    };
+    Ok(matcher)
 }
